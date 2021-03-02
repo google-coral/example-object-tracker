@@ -118,7 +118,8 @@ def main():
             print("--videosrc was set to net but --netsrc was not specified")
             sys.exit()
         cap = cv2.VideoCapture(args.netsrc)    
-
+        
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 0)
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret: 
