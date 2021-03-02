@@ -183,7 +183,7 @@ def append_objs_to_img(cv2_im,  objs, labels, trdata, trackerFlag):
 
     else:
         for obj in objs:
-            x0, y0, x1, y1 = int(ob[0].item()), int(ob[1].item()), int(ob[2].item()), int(ob[3].item())
+            x0, y0, x1, y1 = int(obj[0].item()), int(obj[1].item()), int(obj[2].item()), int(obj[3].item())
             obj_score = obj[4].item()
             obj_id = int(obj[5].item())
 
