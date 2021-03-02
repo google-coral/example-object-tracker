@@ -30,6 +30,7 @@ import argparse
 import numpy as np
 import cv2
 import os
+from PIL import Image
 
 from pycoral.adapters.common import input_size
 from pycoral.adapters.detect import get_objects
@@ -138,7 +139,7 @@ def main():
             run_inference(interpreter, img.flatten())
         else:
             run_inference(interpreter, cv2_im_rgb.tobytes())
-            
+
         objs = get_objects(interpreter, args.threshold)[:args.top_k]
         height, width, channels = cv2_im.shape
         scale_x, scale_y = width / inference_size[0], height / inference_size[1]
