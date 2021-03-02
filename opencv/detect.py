@@ -150,7 +150,7 @@ def main():
 
         cv2_im = append_objs_to_img(cv2_im,  detections, labels, trdata, trackerFlag)
         
-        if args.displayBool == 'True':
+        if args.display == 'True':
             cv2.imshow('frame', cv2_im)
         
         if cv2.waitKey(1) & 0xFF == ord('q'):
