@@ -75,6 +75,7 @@ def main():
                         choices=['True', 'False'])
     parser.add_argument('--netsrc', help="Networked video source, example format: rtsp://192.168.1.43/mpeg4/media.amp",)
     parser.add_argument('--filesrc', help="Video file source. The videos subdirectory gets mapped into the Docker container, so place your files there.",)
+    parser.add_argument('--modelInt8', help="Model expects input tensors to be Int8, not UInt8", default='False', choices=['True', 'False'])
     
     args = parser.parse_args()
     
@@ -101,6 +102,10 @@ def main():
     interpreter.allocate_tensors()
     labels = read_label_file(args.labels)
     inference_size = input_size(interpreter)
+    if args.modelInt8=='True':
+        model_int8 = True
+    else:
+        model_int8 = False
 
     if args.videosrc=='dev': 
         cap = cv2.VideoCapture(args.camera_idx)
@@ -124,7 +129,16 @@ def main():
 
         cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
         cv2_im_rgb = cv2.resize(cv2_im_rgb, inference_size)
-        run_inference(interpreter, cv2_im_rgb.tobytes())
+
+        if model_int8:
+            im_pil = Image.fromarray(cv2_im_rgb)
+            input_type = common.input_details(interpreter, 'dtype')
+            img = (input_type(cv2_im_rgb)- 127.5) / 128.0
+        
+            run_inference(interpreter, img.flatten())
+        else:
+            run_inference(interpreter, cv2_im_rgb.tobytes())
+            
         objs = get_objects(interpreter, args.threshold)[:args.top_k]
         height, width, channels = cv2_im.shape
         scale_x, scale_y = width / inference_size[0], height / inference_size[1]
