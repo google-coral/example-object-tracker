@@ -14,7 +14,7 @@
 
 """A demo that runs object detection on camera frames using OpenCV.
 
-TEST_DATA=../all_models
+TEST_DATA=../models
 
 Run face detection model:
 python3 detect.py \
@@ -27,6 +27,7 @@ python3 detect.py \
 
 """
 import argparse
+import numpy as np
 import cv2
 import os
 
@@ -51,7 +52,7 @@ def detectCoralDevBoard():
 
 def main():
     global mot_tracker
-    default_model_dir = '../all_models'
+    default_model_dir = '../models'
     default_model = 'mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite'
     default_labels = 'coco_labels.txt'
     parser = argparse.ArgumentParser()
@@ -144,7 +145,7 @@ def main():
                 trdata = mot_tracker.update(detections)
                 trackerFlag = True
 
-        cv2_im = append_objs_to_img(cv2_im, inference_size, objs, labels)
+        cv2_im = append_objs_to_img(cv2_im, inference_size, objs, labels, trdata, trackerFlag)
         
         if args.displayBool == 'True':
             cv2.imshow('frame', cv2_im)
@@ -155,20 +156,52 @@ def main():
     cap.release()
     cv2.destroyAllWindows()
 
-def append_objs_to_img(cv2_im, inference_size, objs, labels):
+def append_objs_to_img(cv2_im, inference_size, objs, labels, trdata, trackerFlag):
     height, width, channels = cv2_im.shape
+    src_w, src_h = height, width
+    inf_w, inf_h = inference_size
     scale_x, scale_y = width / inference_size[0], height / inference_size[1]
-    for obj in objs:
-        bbox = obj.bbox.scale(scale_x, scale_y)
-        x0, y0 = int(bbox.xmin), int(bbox.ymin)
-        x1, y1 = int(bbox.xmax), int(bbox.ymax)
+    if trackerFlag and (np.array(trdata)).size:
+        for td in trdata:
+            x0, y0, x1, y1, trackID = td[0].item(), td[1].item(), td[2].item(), td[3].item(), td[4].item()
+            overlap = 0
+            for ob in objs:
+                dx0, dy0, dx1, dy1 = ob.bbox.xmin.item(), ob.bbox.ymin.item(), ob.bbox.xmax.item(), ob.bbox.ymax.item()
+                area = (min(dx1, x1)-max(dx0, x0))*(min(dy1, y1)-max(dy0, y0))
+                if (area > overlap):
+                    overlap = area
+                    obj = ob
 
-        percent = int(100 * obj.score)
-        label = '{}% {}'.format(percent, labels.get(obj.id, obj.id))
+            # Relative coordinates.
+            x, y, w, h = x0, y0, x1 - x0, y1 - y0
+            # Absolute coordinates, input tensor space.
+            x, y, w, h = int(x * inf_w), int(y * inf_h), int(w * inf_w), int(h * inf_h)
+            # Subtract boxing offset.
+            x, y = x - box_x, y - box_y
+            # Scale to source coordinate space.
+            x, y, w, h = x * scale_x, y * scale_y, w * scale_x, h * scale_y
+            percent = int(100 * obj.score)
+            label = '{}% {} ID:{}'.format(
+                percent, labels.get(obj.id, obj.id), int(trackID))
+            shadow_text(dwg, x, y - 5, label)
+            dwg.add(dwg.rect(insert=(x, y), size=(w, h),
+                             fill='none', stroke='red', stroke_width='2'))
+            cv2_im = cv2.rectangle(cv2_im, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            cv2_im = cv2.putText(cv2_im, label, (x, y+30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 0), 2)
 
-        cv2_im = cv2.rectangle(cv2_im, (x0, y0), (x1, y1), (0, 255, 0), 2)
-        cv2_im = cv2.putText(cv2_im, label, (x0, y0+30),
-                             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 0), 2)
+    else:
+        for obj in objs:
+            bbox = obj.bbox.scale(scale_x, scale_y)
+            x0, y0 = int(bbox.xmin), int(bbox.ymin)
+            x1, y1 = int(bbox.xmax), int(bbox.ymax)
+
+            percent = int(100 * obj.score)
+            label = '{}% {}'.format(percent, labels.get(obj.id, obj.id))
+
+            cv2_im = cv2.rectangle(cv2_im, (x0, y0), (x1, y1), (0, 255, 0), 2)
+            cv2_im = cv2.putText(cv2_im, label, (x0, y0+30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 0), 2)
     return cv2_im
 
 if __name__ == '__main__':

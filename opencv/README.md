@@ -19,6 +19,9 @@ USB/PCIe/M.2 Accelerator.
     https://www.tensorflow.org/lite/guide/python)). You can check which version is installed
     using the ```pip3 show tflite_runtime``` command.
 
+1.5 Install PyCoral: https://coral.ai/software/#pycoral-api
+
+
 2.  Clone this Git repo onto your computer or Dev Board:
 
     ```
