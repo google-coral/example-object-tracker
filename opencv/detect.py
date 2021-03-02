@@ -173,7 +173,7 @@ def append_objs_to_img(cv2_im,  objs, labels, trdata, trackerFlag):
                     obj = ob
 
             obj_score = obj[4].item()
-            obj_id = int(obj[5].item)
+            obj_id = int(obj[5].item())
             percent = int(100 * obj_score)
             label = '{}% {} ID:{}'.format(
                 percent, labels.get(obj_id, obj_id), int(trackID))
@@ -185,7 +185,7 @@ def append_objs_to_img(cv2_im,  objs, labels, trdata, trackerFlag):
         for obj in objs:
             x0, y0, x1, y1 = int(ob[0].item()), int(ob[1].item()), int(ob[2].item()), int(ob[3].item())
             obj_score = obj[4].item()
-            obj_id = int(obj[5].item)
+            obj_id = int(obj[5].item())
 
             percent = int(100 * obj_score)
             label = '{}% {}'.format(percent, labels.get(obj_id, obj_id))
