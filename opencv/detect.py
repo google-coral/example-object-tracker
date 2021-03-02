@@ -70,7 +70,7 @@ def main():
                         choices=[None, 'sort'])
     parser.add_argument('--videosrc', help='Directly connected (dev) or Networked (net) video source. ', choices=['dev','net','file'],
                         default='dev')
-    parser.add_argument('--displayBool', help='Is a display attached',
+    parser.add_argument('--display', help='Is a display attached',
                         default='False',
                         choices=['True', 'False'])
     parser.add_argument('--netsrc', help="Networked video source, example format: rtsp://192.168.1.43/mpeg4/media.amp",)
@@ -131,13 +131,13 @@ def main():
         detections = []  # np.array([])
         for obj in objs:
             bbox = obj.bbox.scale(scale_x, scale_y)
-            obj.bbox = bbox
             element = []  # np.array([])
             element.append(bbox.xmin)
             element.append(bbox.ymin)
             element.append(bbox.xmax)
             element.append(bbox.ymax)
             element.append(obj.score)  # print('element= ',element)
+            element.append(obj.id)
             detections.append(element)  # print('dets: ',dets)
         # convert to numpy array #      print('npdets: ',dets)
         detections = np.array(detections)
@@ -148,7 +148,7 @@ def main():
                 trdata = mot_tracker.update(detections)
                 trackerFlag = True
 
-        cv2_im = append_objs_to_img(cv2_im,  objs, labels, trdata, trackerFlag)
+        cv2_im = append_objs_to_img(cv2_im,  detections, labels, trdata, trackerFlag)
         
         if args.displayBool == 'True':
             cv2.imshow('frame', cv2_im)
@@ -166,26 +166,29 @@ def append_objs_to_img(cv2_im,  objs, labels, trdata, trackerFlag):
             x0, y0, x1, y1, trackID = int(td[0].item()), int(td[1].item()), int(td[2].item()), int(td[3].item()), td[4].item()
             overlap = 0
             for ob in objs:
-                dx0, dy0, dx1, dy1 = int(ob.bbox.xmin), int(ob.bbox.ymin), int(ob.bbox.xmax), int(ob.bbox.ymax)
+                dx0, dy0, dx1, dy1 = int(ob[0].item()), int(ob[1].item()), int(ob[2].item()), int(ob[3].item())
                 area = (min(dx1, x1)-max(dx0, x0))*(min(dy1, y1)-max(dy0, y0))
                 if (area > overlap):
                     overlap = area
                     obj = ob
 
-            percent = int(100 * obj.score)
+            obj_score = obj[4].item()
+            obj_id = int(obj[5].item)
+            percent = int(100 * obj_score)
             label = '{}% {} ID:{}'.format(
-                percent, labels.get(obj.id, obj.id), int(trackID))
+                percent, labels.get(obj_id, obj_id), int(trackID))
             cv2_im = cv2.rectangle(cv2_im, (x0, y0), (x1, y1), (0, 255, 0), 2)
             cv2_im = cv2.putText(cv2_im, label, (x0, y0+30),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 0), 2)
 
     else:
         for obj in objs:
-            x0, y0 = int(obj.bbox.xmin), int(obj.bbox.ymin)
-            x1, y1 = int(obj.bbox.xmax), int(obj.bbox.ymax)
+            x0, y0, x1, y1 = int(ob[0].item()), int(ob[1].item()), int(ob[2].item()), int(ob[3].item())
+            obj_score = obj[4].item()
+            obj_id = int(obj[5].item)
 
-            percent = int(100 * obj.score)
-            label = '{}% {}'.format(percent, labels.get(obj.id, obj.id))
+            percent = int(100 * obj_score)
+            label = '{}% {}'.format(percent, labels.get(obj_id, obj_id))
 
             cv2_im = cv2.rectangle(cv2_im, (x0, y0), (x1, y1), (0, 255, 0), 2)
             cv2_im = cv2.putText(cv2_im, label, (x0, y0+30),
