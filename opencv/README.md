@@ -47,11 +47,35 @@ USB/PCIe/M.2 Accelerator.
     ```
 
 
-## Run the detection demo (SSD models)
+## Run the detection model with Sort tracker
+```
+python3 detect.py --tracker sort
+```
+
+## Run the detection demo without any tracker (SSD models)
 
 ```
 python3 detect.py
 ```
+
+## Arguments
+
+*All of the arguments are optional and provide increasing control over the configuration*
+
+ - **model** path to the model you want to use, defaults to COCO
+ - **labels** labels for the model you are using, default to COCO labels
+ - **top_k**  number of categories with highest score to display, defaults to 3
+ - **threshold** classifier score threshold
+ - **videosrc** what video source you want to use. Choices are `net` or `dev`. Default is `dev`:
+    - **dev** a directly connected (dev) camera, can be Coral cam or USB cam or Networked 
+    - **net** network video source, using RTSP. The --netsrc argument must be specified. 
+	- **file** a video file can be used as a source
+ - **camera_idx**  Index of which video source to use. I am not sure how OpenCV enumerates them. Defaults to 0.
+ - **filesrc** the path to the video file. In the Docker container should be at /app/videos
+ - **netsrc** If the `videosrc` is `net` then specify the URL. Example: `rtsp://192.168.1.43/mpeg4/media.amp`
+ - **tracker** Name of the Object Tracker To be used. Choices are `None` or `sort`.
+ - 
+You can change the model and the labels file using ```--model``` and ```--labels```.
 
 By default, this uses the ```mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite``` model.
 
