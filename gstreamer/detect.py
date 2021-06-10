@@ -42,10 +42,11 @@ import re
 import svgwrite
 import time
 from tracker import ObjectTracker
+from trajectories import ObjTrajectories
 
 
 Object = collections.namedtuple('Object', ['id', 'score', 'bbox'])
-
+obj_trajectories = ObjTrajectories()
 
 def load_labels(path):
     p = re.compile(r'\s*(\d+)(.+)')
@@ -91,11 +92,13 @@ def generate_svg(src_size, inference_size, inference_box, objs, labels, text_lin
             # Scale to source coordinate space.
             x, y, w, h = x * scale_x, y * scale_y, w * scale_x, h * scale_y
             percent = int(100 * obj.score)
+            label_name = labels.get(obj.id, obj.id)
             label = '{}% {} ID:{}'.format(
-                percent, labels.get(obj.id, obj.id), int(trackID))
+                percent, label_name, int(trackID))
             shadow_text(dwg, x, y - 5, label)
             dwg.add(dwg.rect(insert=(x, y), size=(w, h),
                              fill='none', stroke='red', stroke_width='2'))
+            obj_trajectories.update_obj_traj_dict(label_name, x, y, w, h, int(trackID), obj.score)
     else:
         for obj in objs:
             x0, y0, x1, y1 = list(obj.bbox)
@@ -113,6 +116,8 @@ def generate_svg(src_size, inference_size, inference_box, objs, labels, text_lin
             shadow_text(dwg, x, y - 5, label)
             dwg.add(dwg.rect(insert=(x, y), size=(w, h),
                              fill='none', stroke='red', stroke_width='2'))
+    obj_trajectories.update_swg_drawing(dwg)
+    obj_trajectories.save_csv('/tmp/traj.csv')
     return dwg.tostring()
 
 
