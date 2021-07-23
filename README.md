@@ -42,10 +42,10 @@ README file for the respective subfolder.
 
 ## Contents
 
-  * __gstreamer__: Python examples using gstreamer to obtain camera streem. These
+  * __gstreamer__: Python examples using gstreamer to obtain camera stream. These
     examples work on Linux using a webcam, Raspberry Pi with
-    the Raspicam and on the Coral DevBoard using the Coral camera. For the
-    former two you will also need a Coral USB Accelerator to run the models.
+    the Raspicam, and on the Coral DevBoard using the Coral camera. For the
+    former two, you will also need a Coral USB Accelerator to run the models.
 
     This demo provides the support of an Object tracker. After following the setup 
     instructions in README file for the subfolder ```gstreamer```, you can run the tracker demo:
