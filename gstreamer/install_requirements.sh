@@ -57,6 +57,7 @@ then
     unzip sort.zip -d ../third_party
     rm sort.zip
     sudo apt install python3-skimage
+    sudo apt install python3-dev
     python3 -m pip install -r requirements_for_sort_tracker.txt
 fi
 echo
