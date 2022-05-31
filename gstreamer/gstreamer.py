@@ -30,7 +30,7 @@ class GstPipeline:
     def __init__(self, pipeline, user_function, src_size, mot_tracker):
         self.user_function = user_function
         self.running = False
-        self.gstbuffer = None
+        self.gstsample = None
         self.sink_size = None
         self.src_size = src_size
         self.box = None
@@ -38,9 +38,12 @@ class GstPipeline:
         self.mot_tracker = mot_tracker
         self.pipeline = Gst.parse_launch(pipeline)
         self.overlay = self.pipeline.get_by_name('overlay')
+        self.gloverlay = self.pipeline.get_by_name('gloverlay')
         self.overlaysink = self.pipeline.get_by_name('overlaysink')
+
         appsink = self.pipeline.get_by_name('appsink')
-        appsink.connect('new-sample', self.on_new_sample)
+        appsink.connect('new-preroll', self.on_new_sample, True)
+        appsink.connect('new-sample', self.on_new_sample, False)
 
         # Set up a pipeline bus watch to catch errors.
         bus = self.pipeline.get_bus()
@@ -85,13 +88,13 @@ class GstPipeline:
             Gtk.main_quit()
         return True
 
-    def on_new_sample(self, sink):
-        sample = sink.emit('pull-sample')
+    def on_new_sample(self, sink, preroll):
+        sample = sink.emit('pull-preroll' if preroll else 'pull-sample')
         if not self.sink_size:
             s = sample.get_caps().get_structure(0)
             self.sink_size = (s.get_value('width'), s.get_value('height'))
         with self.condition:
-            self.gstbuffer = sample.get_buffer()
+            self.gstsample = sample
             self.condition.notify_all()
         return Gst.FlowReturn.OK
 
@@ -115,23 +118,21 @@ class GstPipeline:
     def inference_loop(self):
         while True:
             with self.condition:
-                while not self.gstbuffer and self.running:
+                while not self.gstsample and self.running:
                     self.condition.wait()
                 if not self.running:
                     break
-                gstbuffer = self.gstbuffer
-                self.gstbuffer = None
+                gstsample = self.gstsample
+                self.gstsample = None
 
-            # Passing Gst.Buffer as input tensor avoids 2 copies of it:
-            # * Python bindings copies the data when mapping gstbuffer
-            # * Numpy copies the data when creating ndarray.
-            # This requires a recent version of the python3-edgetpu package. If this
-            # raises an exception please make sure dependencies are up to date.
-            input_tensor = gstbuffer
-            svg = self.user_function(input_tensor, self.src_size, self.get_box(), self.mot_tracker)
+            # Passing Gst.Buffer as input tensor avoids 2 copies of it.
+            gstbuffer = gstsample.get_buffer()
+            svg = self.user_function(gstbuffer, self.src_size, self.get_box(), self.mot_tracker)
             if svg:
                 if self.overlay:
                     self.overlay.set_property('data', svg)
+                if self.gloverlay:
+                    self.gloverlay.emit('set-svg', svg, gstbuffer.pts)
                 if self.overlaysink:
                     self.overlaysink.set_property('svg', svg)
 
@@ -194,13 +195,15 @@ class GstPipeline:
         bus = self.pipeline.get_bus()
         bus.set_sync_handler(on_bus_message_sync, self.overlaysink)
 
-def detectCoralDevBoard():
+def get_dev_board_model():
   try:
-    if 'MX8MQ' in open('/sys/firmware/devicetree/base/model').read():
-      print('Detected Edge TPU dev board.')
-      return True
+    model = open('/sys/firmware/devicetree/base/model').read().lower()
+    if 'mx8mq' in model:
+        return 'mx8mq'
+    if 'mt8167' in model:
+        return 'mt8167'
   except: pass
-  return False
+  return None
 
 def run_pipeline(user_function,
                  src_size,
@@ -228,9 +231,10 @@ def run_pipeline(user_function,
                     ! videoconvert n-threads=4 ! videoscale n-threads=4
                     ! {src_caps} ! {leaky_q} """ % (videosrc, demux)
     ''' Check for the object tracker.'''
+    coral = get_dev_board_model()
     if trackerName != None:
         if trackerName == 'mediapipe':
-            if detectCoralDevBoard():
+            if coral:
                 objectOfTracker = ObjectTracker('mediapipe')
             else:
                 print("Tracker MediaPipe is only available on the Dev Board. Keeping the tracker as None")
@@ -240,12 +244,22 @@ def run_pipeline(user_function,
     else:
         pass
 
-    if detectCoralDevBoard():
-        scale_caps = None
-        PIPELINE += """ ! decodebin ! glupload ! tee name=t
-            t. ! queue ! glfilterbin filter=glbox name=glbox ! {sink_caps} ! {sink_element}
-            t. ! queue ! glsvgoverlaysink name=overlaysink
-        """
+    if coral:
+        if 'mt8167' in coral:
+            PIPELINE += """ ! decodebin ! queue ! v4l2convert ! {scale_caps} !
+              glupload ! glcolorconvert ! video/x-raw(memory:GLMemory),format=RGBA !
+              tee name=t
+                t. ! queue ! glfilterbin filter=glbox name=glbox ! queue ! {sink_caps} ! {sink_element}
+                t. ! queue ! glsvgoverlay name=gloverlay sync=false ! glimagesink fullscreen=true
+                     qos=false sync=false
+            """
+            scale_caps = 'video/x-raw,format=BGRA,width={w},height={h}'.format(w=src_size[0], h=src_size[1])
+        else:
+            PIPELINE += """ ! decodebin ! glupload ! tee name=t
+                t. ! queue ! glfilterbin filter=glbox name=glbox ! {sink_caps} ! {sink_element}
+                t. ! queue ! glsvgoverlaysink name=overlaysink
+            """
+            scale_caps = None
     else:
         scale = min(appsink_size[0] / src_size[0], appsink_size[1] / src_size[1])
         scale = tuple(int(x * scale) for x in src_size)
