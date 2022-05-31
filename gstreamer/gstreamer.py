@@ -196,7 +196,8 @@ class GstPipeline:
 
 def detectCoralDevBoard():
   try:
-    if 'MX8MQ' in open('/sys/firmware/devicetree/base/model').read():
+    model = open('/sys/firmware/devicetree/base/model').read().lower()
+    if 'mx8mq' in model or 'mt8167' in model:
       print('Detected Edge TPU dev board.')
       return True
   except: pass
